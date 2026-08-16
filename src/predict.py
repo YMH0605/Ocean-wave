@@ -88,6 +88,24 @@ def main() -> int:
         ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
         targs = ckpt["args"]
 
+        # The network outputs normalised values; converting them back to metres
+        # uses the min/max of the cache. If this cache was built from a
+        # different set of years than the one the checkpoint was trained on,
+        # that conversion is wrong -- and wrong quietly, since the numbers stay
+        # plausible. Refuse rather than report nonsense.
+        saved = ckpt.get("target_stats")
+        current = cache.stats[targs["target"]]
+        if saved is not None:
+            drift = max(abs(saved["min"] - current["min"]),
+                        abs(saved["max"] - current["max"]))
+            if drift > 1e-4:
+                print(f"[predict] SKIPPING {name}: it was trained against a "
+                      f"cache normalised to "
+                      f"[{saved['min']:.3f}, {saved['max']:.3f}] but this one "
+                      f"is [{current['min']:.3f}, {current['max']:.3f}]. "
+                      f"Rebuild the cache from the same years, or retrain.")
+                continue
+
         # Models are only comparable if they predict the same variable at the
         # same lead from the same window length -- otherwise the accumulated
         # truth array belongs to a different set of samples than the

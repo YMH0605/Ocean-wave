@@ -44,3 +44,6 @@ venv/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# --- teaching subset (distributed as a GitHub Release asset) ----------
+_teaching_subset/

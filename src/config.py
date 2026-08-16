@@ -17,12 +17,19 @@ approach corridor and the Gulf Stream front, and (b) survive three rounds of
 from pathlib import Path
 
 # ---------------------------------------------------------------- paths
+import os
+
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 RAW = DATA / "raw"
 INTERIM = DATA / "interim"
 PROCESSED = DATA / "processed"
-OUTPUTS = ROOT / "outputs"
+
+# Where results are written. Redirectable so a test run cannot overwrite real
+# results: the pipeline smoke test points this at a sandbox, because its
+# predict step would otherwise write test_metrics_swh_h1.csv over the genuine
+# one and its cleanup would then delete it.
+OUTPUTS = Path(os.environ.get("WAVE_OUTPUT_DIR", ROOT / "outputs"))
 FIGURES = OUTPUTS / "figures"
 TABLES = OUTPUTS / "tables"
 

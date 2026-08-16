@@ -264,8 +264,13 @@ def main() -> int:
 
         if metrics["val_loss"] < best - 1e-6:
             best, bad_epochs = metrics["val_loss"], 0
+            # Record the normalisation the weights were fitted against. A
+            # checkpoint used with a cache built from different years would be
+            # denormalised with the wrong min/max and produce silently wrong
+            # values in metres; predict.py checks this and refuses.
             torch.save({"model": model.state_dict(), "args": vars(args),
-                        "epoch": epoch, "metrics": metrics}, ckpt_path)
+                        "epoch": epoch, "metrics": metrics,
+                        "target_stats": cache.stats[args.target]}, ckpt_path)
             print(f"           saved {ckpt_path.name}")
         else:
             bad_epochs += 1

@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from config import LAT_MAX, LAT_MIN, LON_MAX, LON_MIN, N_LAT, N_LON, TABLES
+from config import LAT_MAX, LAT_MIN, LON_MAX, LON_MIN, N_LAT, N_LON
 
 # Chosen so the year-based splits in dataset.py all end up non-empty:
 # 2016/2017 -> train, 2018 -> val, 2019-2021 -> test.
@@ -95,10 +95,13 @@ def main() -> int:
     print(f"[smoke] wrote {len(FAKE_YEARS)} synthetic years "
           f"({STEPS_PER_YEAR} steps each)")
 
-    # Point the cache at the sandbox before anything imports preprocess, so
-    # this process and the train/predict subprocesses agree on the paths.
+    # Point the cache AND the output tree at the sandbox before anything
+    # imports config or preprocess, so this process and the train/predict
+    # subprocesses agree on the paths. Redirecting the outputs is what keeps a
+    # test run from overwriting real checkpoints, logs and metric tables.
     os.environ["WAVE_ERA5_DIR"] = str(era5_dir)
     os.environ["WAVE_CACHE_DIR"] = str(processed)
+    os.environ["WAVE_OUTPUT_DIR"] = str(sandbox / "outputs")
 
     import preprocess
 
@@ -130,6 +133,7 @@ def main() -> int:
     env_paths = {
         "WAVE_ERA5_DIR": str(era5_dir),
         "WAVE_CACHE_DIR": str(processed),
+        "WAVE_OUTPUT_DIR": str(sandbox / "outputs"),
     }
     train_cmd = [
         sys.executable, "-u", "train.py", "--model", "unet3d",
@@ -154,17 +158,13 @@ def main() -> int:
         print("[smoke] prediction FAILED")
         return 1
 
-    # The smoke run writes a checkpoint and a log into the real outputs tree;
-    # remove them so they cannot be mistaken for a genuine experiment.
-    from train import CHECKPOINTS, LOGS
-    for leftover in (CHECKPOINTS / "unet3d_swh_full_lb48_h1_smoke.pt",
-                     LOGS / "unet3d_swh_full_lb48_h1_smoke.json"):
-        leftover.unlink(missing_ok=True)
-    for leftover in TABLES.glob("test_metrics_*_h1.csv"):
-        leftover.unlink(missing_ok=True)
-
+    # Everything this run produced lives under the sandbox, so removing it is
+    # the whole cleanup. Nothing in the real outputs tree was ever touched --
+    # an earlier version wrote there and then deleted by glob, which took the
+    # genuine metric table with it.
     shutil.rmtree(sandbox, ignore_errors=True)
-    print("\n[smoke] pipeline OK end to end (sandbox and artefacts removed)")
+    print("\n[smoke] pipeline OK end to end (sandbox removed; "
+          "real outputs untouched)")
     return 0
 
 

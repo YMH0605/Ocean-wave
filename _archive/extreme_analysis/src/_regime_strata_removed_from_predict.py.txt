@@ -1,0 +1,27 @@
+def regime_strata(t_index, cache, valid, lead: int,
+                  events_csv=TABLES / "extreme_events.csv"):
+    """Split test points into TC-storm / ET-storm / background hours.
+
+    Labelling uses the FORECAST time (t + lead), not the anchor time. At a
+    48-hour lead the two differ by two days, which is long enough to put a
+    sample on the wrong side of a storm window.
+    """
+    if not events_csv.exists():
+        return None
+
+    events = pd.read_csv(events_csv, parse_dates=["time_start", "time_end"])
+    times = pd.to_datetime(cache.times[t_index + lead])
+
+    label = np.full(len(t_index), "background", dtype=object)
+    for _, ev in events.iterrows():
+        # Comparing a DatetimeIndex yields a plain ndarray, not a Series.
+        inside = np.asarray((times >= ev["time_start"])
+                            & (times <= ev["time_end"]))
+        label[inside] = f"{ev['origin']}-storm"
+
+    strata = {}
+    for name in ("TC-storm", "ET-storm", "background"):
+        sel = (label == name)
+        if sel.any():
+            strata[name] = valid & sel[:, None, None, None]
+    return strata

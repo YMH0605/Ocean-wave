@@ -1,0 +1,50 @@
+def _check_extremes(cache) -> bool:
+    """Exercise the event detector's logic without writing to outputs/.
+
+    Calls the component functions rather than extremes.main() so the real
+    catalogue and figures are not overwritten by synthetic results.
+    """
+    import extremes
+    import hurdat2
+
+    series = extremes.domain_series(cache, stat="p95")
+    print(f"  domain series: {len(series):,} steps, "
+          f"{series.min():.2f}-{series.max():.2f} m, mean {series.mean():.2f} m")
+    if not np.isfinite(series).all():
+        print("  !! domain series contains non-finite values")
+        return False
+
+    events = extremes.detect_events(series, cache.times, cache.years,
+                                    percentile=95.0)
+    if events.empty:
+        print("  !! no events detected on data that contains storms")
+        return False
+
+    tracks, _ = hurdat2.load()
+    events = extremes.label_origin(events, tracks)
+
+    print(f"  detected {len(events)} events; "
+          f"TC={int((events['origin'] == 'TC').sum())} "
+          f"ET={int((events['origin'] == 'ET').sum())}")
+    print(f"  duration {events['duration_hr'].min()}-"
+          f"{events['duration_hr'].max()} h, "
+          f"peak SWH {events['peak_swh_m'].max():.2f} m")
+
+    threshold = events.attrs["threshold"]
+    problems = []
+    if (events["duration_hr"] < extremes.MIN_DURATION_HR).any():
+        problems.append("an event is shorter than MIN_DURATION_HR")
+    if (events["peak_swh_m"] < threshold).any():
+        problems.append("an event peaks below its own threshold")
+    if (events["time_start"] > events["time_end"]).any():
+        problems.append("an event ends before it starts")
+    if (events["start_index"].values[1:] < events["end_index"].values[:-1]).any():
+        problems.append("events overlap after merging")
+    if not set(events["origin"]) <= {"TC", "ET"}:
+        problems.append("unexpected origin label")
+
+    for p in problems:
+        print(f"  !! {p}")
+    if not problems:
+        print("  event catalogue passes all consistency checks")
+    return not problems

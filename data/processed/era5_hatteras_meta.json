@@ -1,0 +1,22 @@
+{
+  "shape": [
+    227928,
+    7,
+    32,
+    48
+  ],
+  "channels": [
+    "swh",
+    "mp2",
+    "pp1d",
+    "mwd_sin",
+    "mwd_cos",
+    "u10",
+    "v10"
+  ],
+  "dtype": "float32",
+  "year_start": 2000,
+  "year_end": 2025,
+  "n_time_gaps": 0,
+  "land_fraction": 0.2779947916666667
+}

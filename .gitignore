@@ -1,0 +1,46 @@
+# --- data -------------------------------------------------------------
+# ~20 GB of ERA5. Regenerate with src/download_era5.py + src/preprocess.py;
+# both are resumable, and a CDS account is free.
+data/
+# ... except the small metadata sidecars, which the notebook reads to describe
+# the dataset. A few kB each, and without them section 1 cannot run.
+!data/
+!data/processed/
+data/processed/*
+!data/processed/era5_hatteras_meta.json
+!data/processed/norm_stats.json
+data/raw/
+data/interim/
+
+# --- model weights ----------------------------------------------------
+# 15-23 MB each. Retrain with src/run_experiments.py, or ask for a copy.
+# The one checkpoint the notebook needs is whitelisted below.
+outputs/checkpoints/*.pt
+outputs/checkpoints/*.bak
+!outputs/checkpoints/unet3d_swh_full_lb48_h1.pt
+
+# --- python -----------------------------------------------------------
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+*.egg-info/
+
+# --- credentials ------------------------------------------------------
+# Never commit these. The CDS token lives in %USERPROFILE%\.cdsapirc,
+# outside the repo, and the code reads it from there.
+.cdsapirc
+*.key
+*.pem
+.env
+
+# --- tooling ----------------------------------------------------------
+.claude/
+
+# --- editors / os -----------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

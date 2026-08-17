@@ -72,8 +72,32 @@ def main() -> int:
     names = args.checkpoints or []
     if args.all:
         names = [p.stem for p in CHECKPOINTS.glob("*.pt")]
+
     if not names:
-        print("nothing to evaluate; pass --checkpoints or --all")
+        # Tell the caller what is actually available rather than just refusing.
+        # Grouping by lead time matters because only one group can be evaluated
+        # per invocation -- see the signature check below.
+        found = sorted(p.stem for p in CHECKPOINTS.glob("*.pt"))
+        if not found:
+            print(f"No trained models in {CHECKPOINTS}.\n"
+                  f"Train one first:  python train.py --model unet3d --lead 1")
+            return 1
+
+        by_lead: dict[str, list[str]] = {}
+        for stem in found:
+            lead = stem.rsplit("_h", 1)[-1] if "_h" in stem else "?"
+            by_lead.setdefault(lead, []).append(stem)
+
+        print("Which model(s) should I score? Pass them with --checkpoints.\n")
+        print(f"Available in {CHECKPOINTS.name}/ "
+              f"(one lead time per run — they are scored on different samples):\n")
+        for lead in sorted(by_lead, key=lambda s: int(s) if s.isdigit() else 999):
+            print(f"  +{lead} h")
+            for stem in by_lead[lead]:
+                print(f"      {stem}")
+        example = " ".join(by_lead[min(by_lead, key=lambda s: int(s)
+                                       if s.isdigit() else 999)])
+        print(f"\nFor example:\n  python predict.py --checkpoints {example}")
         return 1
 
     cache = ERA5Cache(load_to_ram=False)
@@ -169,7 +193,23 @@ def main() -> int:
 
     df = evaluate(predictions, truth, valid)
     print(format_report(df, target, lead))
-    df.to_csv(TABLES / f"test_metrics_{target}_h{lead}.csv", index=False)
+
+    # Merge into the table rather than replacing it. Scoring a subset of the
+    # models used to overwrite the file with only those rows, silently
+    # discarding every other model's results -- which broke the notebook three
+    # times. Rows for the models just evaluated are refreshed; everything else
+    # is left alone.
+    dest = TABLES / f"test_metrics_{target}_h{lead}.csv"
+    if dest.exists():
+        old = pd.read_csv(dest)
+        kept = old[~old["model"].isin(df["model"].unique())]
+        if len(kept):
+            print(f"[predict] keeping {kept['model'].nunique()} model(s) "
+                  f"already in {dest.name}: "
+                  f"{', '.join(sorted(kept['model'].unique()))}")
+        df = pd.concat([kept, df], ignore_index=True)
+    df.to_csv(dest, index=False)
+    print(f"[predict] -> {dest}")
     return 0
 
 

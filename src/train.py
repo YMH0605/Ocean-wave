@@ -67,6 +67,8 @@ def parse_args():
                     help="max gradient norm; 0 disables clipping")
     ap.add_argument("--warmup-steps", type=int, default=500)
     ap.add_argument("--tag", default="")
+    ap.add_argument("--force", action="store_true",
+                    help="overwrite an existing checkpoint of the same name")
     return ap.parse_args()
 
 
@@ -117,7 +119,7 @@ def validate(model, loader, device, cache, target, amp_dtype):
 
     for batch in loader:
         x = batch["x"].to(device, non_blocking=True)
-        y = batch["y"].to(device, non_blocking=True)
+        y = batch["y"].to(device, non_blocking=True) 
         valid = batch["valid"].to(device, non_blocking=True).float()
         ocean = valid
 
@@ -156,6 +158,22 @@ def main() -> int:
     if device != "cuda":
         amp_dtype = None
 
+    # Refuse to clobber finished work. Every argument has a default, so a bare
+    # `python train.py` resolves to unet3d/swh/full/lb48/h1 -- the name of a
+    # model that may already represent hours of training. Interrupting such a
+    # run leaves a one-epoch checkpoint in its place, which is exactly how the
+    # first fully trained U-Net was lost.
+    ckpt_path = CHECKPOINTS / f"{name}.pt"
+    if ckpt_path.exists() and not args.force:
+        import torch as _t
+        old = _t.load(ckpt_path, map_location="cpu", weights_only=False)
+        print(f"[train] {ckpt_path.name} already exists "
+              f"(epoch {old.get('epoch')}, "
+              f"val MAE {old.get('metrics', {}).get('val_mae', float('nan')):.4f}).\n"
+              f"        Training would overwrite it. Either give this run its own\n"
+              f"        name with --tag, or pass --force to replace the file.")
+        return 1
+
     print(f"[train] run={name}  device={device}  amp={args.amp}")
 
     cache = ERA5Cache(load_to_ram=False)
@@ -191,7 +209,6 @@ def main() -> int:
     scaler = torch.amp.GradScaler("cuda", enabled=(args.amp == "fp16"))
 
     history, best, bad_epochs = [], np.inf, 0
-    ckpt_path = CHECKPOINTS / f"{name}.pt"
     global_step = 0
     max_grad_seen = 0.0
 

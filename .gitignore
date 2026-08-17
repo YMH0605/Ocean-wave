@@ -50,3 +50,6 @@ _teaching_subset/
 
 # --- 教学大纲（中文，仅本地保留，不进仓库）--------------------------
 TEACHING_GUIDE.md
+
+# search produces throwaway checkpoints; keep the logs and the results table
+outputs/hparam_search/checkpoints/

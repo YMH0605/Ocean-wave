@@ -176,11 +176,12 @@ def main() -> int:
                               sampler=sampler, drop_last=True, **loader_kw)
     val_loader = DataLoader(val_ds, shuffle=False, **loader_kw)
 
+    # Every architecture now takes the same capacity knobs, so a comparison can
+    # be made at matched parameter counts rather than at whatever each model's
+    # defaults happened to be.
     model = build(args.model, in_channels=train_ds.n_channels,
-                  lookback=args.lookback,
-                  **({} if args.model == "convlstm"
-                     else dict(base_channels=args.base_channels,
-                               depth=args.depth))).to(device)
+                  lookback=args.lookback, base_channels=args.base_channels,
+                  depth=args.depth).to(device)
     print(f"[train] {args.model}: {count_parameters(model):,} parameters")
 
     opt = torch.optim.Adam(model.parameters(), lr=args.lr,
@@ -270,6 +271,7 @@ def main() -> int:
             # values in metres; predict.py checks this and refuses.
             torch.save({"model": model.state_dict(), "args": vars(args),
                         "epoch": epoch, "metrics": metrics,
+                        "convlstm_capacity": True,
                         "target_stats": cache.stats[args.target]}, ckpt_path)
             print(f"           saved {ckpt_path.name}")
         else:

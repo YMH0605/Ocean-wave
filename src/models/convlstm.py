@@ -41,11 +41,21 @@ class ConvLSTM(nn.Module):
         self,
         in_channels: int,
         lookback: int = 48,
-        hidden_channels=(64, 64),
+        base_channels: int = 32,
+        depth: int = 2,
+        hidden_channels=None,
         kernel: int = 3,
         out_channels: int = 1,
     ):
+        """`base_channels` and `depth` mean the same thing here as in the
+        convolutional models, so one capacity knob drives every architecture
+        and the comparison can be made at matched parameter counts. Each layer
+        holds 2 x base_channels hidden units, which reproduces the previous
+        hard-coded (64, 64) at the default base_channels=32.
+        """
         super().__init__()
+        if hidden_channels is None:
+            hidden_channels = tuple([2 * base_channels] * depth)
         self.cells = nn.ModuleList()
         prev = in_channels
         for hidden in hidden_channels:

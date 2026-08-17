@@ -129,11 +129,15 @@ def main() -> int:
                             num_workers=args.num_workers,
                             pin_memory=(device == "cuda"))
 
+        # Checkpoints written before ConvLSTM took capacity arguments have no
+        # usable base_channels for it; those weights were built with the old
+        # hard-coded (64, 64), which is what base_channels=32 now reproduces.
+        caps = dict(base_channels=targs.get("base_channels", 32),
+                    depth=targs.get("depth", 3))
+        if targs["model"] == "convlstm" and "convlstm_capacity" not in targs:
+            caps = dict(base_channels=32, depth=2)
         model = build(targs["model"], in_channels=ds.n_channels,
-                      lookback=targs["lookback"],
-                      **({} if targs["model"] == "convlstm"
-                         else dict(base_channels=targs["base_channels"],
-                                   depth=targs["depth"]))).to(device)
+                      lookback=targs["lookback"], **caps).to(device)
         model.load_state_dict(ckpt["model"])
 
         print(f"[predict] {name}: {len(ds):,} test samples "
